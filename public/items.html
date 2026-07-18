@@ -111,11 +111,18 @@
         </div>
       </div>
       
-      <div class="ledger" style="margin-top: 22px;">
-        <div class="ledger-head" style="grid-template-columns: 1fr 180px 100px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 22px; gap: 10px; flex-wrap: wrap;">
+        <h3 style="font-size: 16px; margin: 0; color: var(--ink);">Recent Orders</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="clearCustomersBtn" class="remove-btn" style="padding: 6px 12px; font-size: 12px; height: auto; width: auto; margin: 0;">Clear Customers</button>
+          <button id="clearOrderHistoryBtn" class="remove-btn" style="padding: 6px 12px; font-size: 12px; height: auto; width: auto; margin: 0;">Clear Order History</button>
+        </div>
+      </div>
+      <div class="ledger" style="margin-top: 10px;">
+        <div class="ledger-head" style="grid-template-columns: 1fr 180px 140px;">
           <span>Recent Customer</span>
           <span>Date & Time</span>
-          <span style="text-align: right;">Total Bill</span>
+          <span style="text-align: right; padding-right: 12px;">Total Bill</span>
         </div>
         <div id="recentOrdersList"></div>
       </div>
@@ -184,6 +191,10 @@
 
     <!-- Tab 5: Receipts -->
     <div id="tab-receipts" class="tab-pane">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <h3 style="font-size: 16px; margin: 0; color: var(--ink);">Receipts / Sales History</h3>
+        <button id="clearReceiptHistoryBtn" class="remove-btn" style="padding: 6px 12px; font-size: 12px; height: auto; width: auto; margin: 0;">Clear Sales History</button>
+      </div>
       <div id="receiptsContainer" class="receipts-list">
         <!-- Rendered dynamically -->
       </div>
@@ -216,8 +227,8 @@
         <div class="ledger-head" style="grid-template-columns: 200px 180px 1fr 100px;">
           <span>Customer Name</span>
           <span>Last Order Date</span>
-          <span>Item Price Profile History (Suggested Auto-prefills)</span>
-          <span style="text-align: right;">Actions</span>
+          <span>Preferred Pricing History</span>
+          <span style="text-align: right; padding-right: 12px;">Action</span>
         </div>
         <div id="customersListContainer"></div>
       </div>
@@ -235,10 +246,6 @@
           <div class="stat-card">
             <div class="num mono" id="supplierStatOwed">0.00</div>
             <div class="lbl">Total Owed</div>
-          </div>
-          <div class="stat-card">
-            <div class="num mono" id="supplierStatAdvance">0.00</div>
-            <div class="lbl">Total Advance</div>
           </div>
         </div>
 
@@ -281,16 +288,16 @@
             <div id="supplier-detail-name" style="font-size: 20px; font-weight: 700; color: var(--ink);">Supplier Name</div>
             <div id="supplier-detail-contact" style="font-size: 13px; color: var(--muted);">Contact details</div>
           </div>
-          <div class="stats-row" style="margin: 0; gap: 10px; min-width: 300px; flex: 1; justify-content: flex-end;">
-            <div class="stat-card" style="padding: 10px 14px; min-width: 100px;">
+          <div class="stats-row" style="margin: 0; gap: 10px; min-width: 400px; flex: 1; justify-content: flex-end;">
+            <div class="stat-card" style="padding: 10px 14px; min-width: 90px;">
               <div class="lbl" style="font-size: 11px;">Billed</div>
               <div class="num mono" id="supplier-detail-billed" style="font-size: 15px; margin-top: 2px;">0.00</div>
             </div>
-            <div class="stat-card" style="padding: 10px 14px; min-width: 100px;">
+            <div class="stat-card" style="padding: 10px 14px; min-width: 90px;">
               <div class="lbl" style="font-size: 11px;">Paid</div>
               <div class="num mono" id="supplier-detail-paid" style="font-size: 15px; margin-top: 2px;">0.00</div>
             </div>
-            <div class="stat-card" style="padding: 10px 14px; min-width: 100px;">
+            <div class="stat-card" style="padding: 10px 14px; min-width: 90px;">
               <div class="lbl" style="font-size: 11px;">Balance</div>
               <div class="num mono" id="supplier-detail-balance" style="font-size: 15px; margin-top: 2px;">0.00</div>
             </div>
@@ -303,8 +310,8 @@
             <div class="add-bar-title">Log a Payment</div>
             <div class="add-form" style="margin-top: 10px;">
               <div class="field" style="flex: 1;">
-                <label for="supplier-pay-amount">Amount Paid</label>
-                <input type="number" id="supplier-pay-amount" min="0.01" step="0.01" placeholder="0.00">
+                <label for="supplier-pay-amount">Amount Paid / Returned</label>
+                <input type="number" id="supplier-pay-amount" step="0.01" placeholder="0.00 (use negative for refund)">
               </div>
               <button class="add-btn" id="supplierPayBtn" style="background: var(--rust-dark);">Record Payment</button>
             </div>
@@ -485,6 +492,13 @@
         <div style="margin-top: 18px;">
           <button class="add-btn" id="calculateProfitBtn" style="padding: 10px 20px;">Calculate Profit</button>
         </div>
+      </div>
+
+      <!-- Missing Buying Prices section -->
+      <div id="profitMissingPricesSection" class="add-bar" style="border-style: solid; border-color: var(--rust); margin-bottom: 22px; display: none;">
+        <div class="add-bar-title" style="color: var(--rust-dark); font-size: 14.5px; font-weight: 600; margin-bottom: 8px;">Missing Buying Prices</div>
+        <p style="font-size: 13px; color: var(--muted); margin: 0 0 12px 0;">The following items do not have supplier prices. Please enter their buying prices to calculate profit accurately:</p>
+        <div id="profitMissingPricesList" style="display: flex; flex-direction: column; gap: 12px;"></div>
       </div>
 
       <div class="stats-row">

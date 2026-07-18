@@ -9,6 +9,7 @@ const CUSTOMERS_STORAGE_KEY = 'stockroom-customers-v1';
 const PREP_CLEARED_STORAGE_KEY = 'stockroom-prep-cleared-at-v1';
 const SUPPLIERS_STORAGE_KEY = 'stockroom-suppliers-v1';
 const EXPENSES_STORAGE_KEY = 'stockroom-expenses-v1';
+const MANUAL_PRICES_STORAGE_KEY = 'stockroom-manual-buying-prices-v1';
 const LOW_STOCK = 12;
 
 let items = [];
@@ -18,11 +19,13 @@ let customers = [];
 let prepClearedAt = null;
 let suppliers = [];
 let expenses = [];
+let manualBuyingPrices = {};
 let selectedExpenseListId = null;
 let selectedSupplierId = null;
 let activeSupplierBillDraft = null;
 let editingSupplierBillId = null;
 let modalContext = 'customer';
+let currentTabId = 'items';
 
 // ---------- DOM refs ----------
 // Items tab
@@ -95,7 +98,7 @@ const supplierBillsHistoryList = document.getElementById('supplierBillsHistoryLi
 const supplierPaymentsHistoryList = document.getElementById('supplierPaymentsHistoryList');
 const supplierStatCount = document.getElementById('supplierStatCount');
 const supplierStatOwed = document.getElementById('supplierStatOwed');
-const supplierStatAdvance = document.getElementById('supplierStatAdvance');
+const clearCustomersBtn = document.getElementById('clearCustomersBtn');
 
 // Expenses Tab DOM elements
 const expNewName = document.getElementById('exp-new-name');
@@ -218,6 +221,7 @@ const tabMeta = {
 };
 
 function switchTab(tabId) {
+  currentTabId = tabId;
   // Update navigation items styling
   document.querySelectorAll('.nav-item').forEach(n => {
     if (n.dataset.tab === tabId) {
@@ -250,7 +254,10 @@ function switchTab(tabId) {
   if (tabId === 'orders') renderOrders();
   if (tabId === 'placed-items') renderPlacedItems();
   if (tabId === 'load-lists') renderLoadLists();
-  if (tabId === 'billing') renderBilling();
+  if (tabId === 'billing') {
+    modalContext = 'customer';
+    renderBilling();
+  }
   if (tabId === 'receipts') renderReceipts();
   if (tabId === 'customers') renderCustomers();
   if (tabId === 'suppliers') renderSuppliers();
@@ -292,9 +299,20 @@ function loadAllData(){
     const rawExpenses = window.localStorage.getItem(EXPENSES_STORAGE_KEY);
     expenses = rawExpenses ? JSON.parse(rawExpenses) : [];
 
+    const rawManual = window.localStorage.getItem(MANUAL_PRICES_STORAGE_KEY);
+    manualBuyingPrices = rawManual ? JSON.parse(rawManual) : {};
+
     prepClearedAt = window.localStorage.getItem(PREP_CLEARED_STORAGE_KEY) || null;
   } catch (err) {
     console.error('Failed to load data from localStorage', err);
+  }
+}
+
+function saveManualBuyingPrices() {
+  try {
+    window.localStorage.setItem(MANUAL_PRICES_STORAGE_KEY, JSON.stringify(manualBuyingPrices));
+  } catch (err) {
+    console.error('Failed to save manual buying prices', err);
   }
 }
 
@@ -484,14 +502,24 @@ function addStockroomItem(){
     return;
   }
 
-  const created = createItem(name, isNaN(qty) || qty < 0 ? 0 : qty);
-  items.push(created);
+  const existingIdx = items.findIndex(i => i.name.toLowerCase() === name.toLowerCase());
+  const addition = isNaN(qty) || qty < 0 ? 0 : qty;
+  
+  if (existingIdx !== -1) {
+    items[existingIdx].qty = Number(items[existingIdx].qty || 0) + addition;
+    items[existingIdx].updatedAt = new Date().toISOString();
+    showToast(`Updated quantity for existing item: ${items[existingIdx].name}`);
+  } else {
+    const created = createItem(name, addition);
+    items.push(created);
+    showToast('Item added to Stockroom');
+  }
+  
   saveItems();
   newName.value = '';
   newQty.value = '';
   renderItems();
   newName.focus();
-  showToast('Item added to Stockroom');
 }
 
 addBtn.addEventListener('click', addStockroomItem);
@@ -520,6 +548,44 @@ startOrderBtn.addEventListener('click', () => {
 custNameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') startOrderBtn.click();
 });
+
+const clearOrderHistoryBtn = document.getElementById('clearOrderHistoryBtn');
+const clearReceiptHistoryBtn = document.getElementById('clearReceiptHistoryBtn');
+
+function clearAllSalesHistory() {
+  if (confirm('Are you sure you want to clear all order and receipts history? This cannot be undone.')) {
+    orders = [];
+    activeOrder = null;
+    saveOrders();
+    saveActiveOrder();
+    if (typeof renderOrders === 'function') renderOrders();
+    if (typeof renderReceipts === 'function') renderReceipts();
+    if (typeof renderPlacedItems === 'function') renderPlacedItems();
+    if (typeof renderLoadLists === 'function') renderLoadLists();
+    if (typeof renderBilling === 'function') renderBilling();
+    showToast('Sales and order history cleared');
+  }
+}
+
+function clearAllCustomerProfiles() {
+  if (confirm('Delete all customer profiles and recent customer history?')) {
+    customers = [];
+    saveCustomers();
+    if (typeof renderCustomers === 'function') renderCustomers();
+    if (typeof renderOrders === 'function') renderOrders();
+    showToast('Customer profiles cleared');
+  }
+}
+
+if (clearOrderHistoryBtn) {
+  clearOrderHistoryBtn.addEventListener('click', clearAllSalesHistory);
+}
+if (clearReceiptHistoryBtn) {
+  clearReceiptHistoryBtn.addEventListener('click', clearAllSalesHistory);
+}
+if (clearCustomersBtn) {
+  clearCustomersBtn.addEventListener('click', clearAllCustomerProfiles);
+}
 
 // Customer autocomplete dropdown handler
 custNameInput.addEventListener('input', () => {
@@ -590,8 +656,9 @@ function renderOrders() {
         <div class="item-sub">${order.items.length} items ordered</div>
       </div>
       <div class="mono" style="font-size: 13px; color: var(--muted);">${formattedDate}</div>
-      <div style="display: flex; align-items: center; gap: 12px; justify-content: flex-end;">
+      <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
         <div class="mono" style="font-weight: 700; color: var(--rust-dark);">${Number(order.total || 0).toFixed(2)}</div>
+        <button class="remove-btn" data-role="delete-customer" data-name="${escapeHtml(order.customerName)}" style="padding: 6px 10px; font-size: 11px; height: auto; width: auto;">Del</button>
         <button class="add-btn" data-role="edit-order" data-id="${order.id}" style="padding: 6px 12px; font-size: 12px; height: auto; background: var(--ink);">Edit</button>
       </div>
     `;
@@ -607,6 +674,31 @@ recentOrdersList.addEventListener('click', (e) => {
     e.stopPropagation();
     const orderId = editBtn.dataset.id;
     triggerEditOrder(orderId);
+    return;
+  }
+
+  const deleteBtn = e.target.closest('button[data-role="delete-customer"]');
+  if (deleteBtn) {
+    e.stopPropagation();
+    const customerName = deleteBtn.dataset.name;
+    if (confirm(`Delete recent customer "${customerName}" and all matching order history?`)) {
+      const normalized = customerName.toLowerCase();
+      orders = orders.filter(order => order.customerName.toLowerCase() !== normalized);
+      customers = customers.filter(customer => customer.name.toLowerCase() !== normalized);
+      saveOrders();
+      saveCustomers();
+      if (activeOrder && activeOrder.customerName && activeOrder.customerName.toLowerCase() === normalized) {
+        activeOrder = null;
+        saveActiveOrder();
+      }
+      renderOrders();
+      renderReceipts();
+      renderPlacedItems();
+      renderLoadLists();
+      renderCustomers();
+      renderBilling();
+      showToast(`Removed customer ${customerName}`);
+    }
     return;
   }
 
@@ -826,11 +918,14 @@ billingSearch.addEventListener('input', () => {
       const div = document.createElement('div');
       div.className = 'suggestion-item';
       const isOut = Number(item.qty) === 0;
+      const lastCost = findBuyingPrice(item.name);
+      const costStr = lastCost > 0 ? ` <span class="mono" style="color: var(--muted); font-size: 11px; margin-left: 8px;">(Cost: ${lastCost.toFixed(2)})</span>` : '';
       div.innerHTML = `
-        <span style="font-weight: 500;">${escapeHtml(item.name)}</span>
+        <span style="font-weight: 500;">${escapeHtml(item.name)}${costStr}</span>
         <span class="suggestion-qty ${isOut ? 'out' : ''}">${isOut ? 'Out of Stock' : `Qty: ${item.qty}`}</span>
       `;
       div.addEventListener('click', () => {
+        modalContext = 'customer';
         openPriceQtyModal(item.name);
       });
       searchSuggestions.appendChild(div);
@@ -845,6 +940,7 @@ billingSearch.addEventListener('input', () => {
     <span class="suggestion-qty out">Non-Stock</span>
   `;
   customDiv.addEventListener('click', () => {
+    modalContext = 'customer';
     openPriceQtyModal(billingSearch.value);
   });
   searchSuggestions.appendChild(customDiv);
@@ -862,6 +958,7 @@ document.addEventListener('click', (e) => {
 billingAddCustomBtn.addEventListener('click', () => {
   const val = billingSearch.value.trim();
   if (val !== '') {
+    modalContext = 'customer';
     openPriceQtyModal(val);
   } else {
     billingSearch.focus();
@@ -872,6 +969,7 @@ billingSearch.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const val = billingSearch.value.trim();
     if (val !== '') {
+      modalContext = 'customer';
       openPriceQtyModal(val);
     }
   }
@@ -923,15 +1021,12 @@ finalizeOrderBtn.addEventListener('click', () => {
   // Deduct inventory quantities for matching stock items.
   // If a custom item doesn't exist, auto-add it to stock items registry with 0 quantity.
   activeOrder.items.forEach(orderItem => {
+    ensureItemExistsInStock(orderItem.name, 0);
     const stockItemIndex = items.findIndex(i => i.name.toLowerCase() === orderItem.name.toLowerCase());
     if (stockItemIndex !== -1) {
       const currentQty = Number(items[stockItemIndex].qty || 0);
       items[stockItemIndex].qty = Math.max(0, currentQty - orderItem.qty);
       items[stockItemIndex].updatedAt = new Date().toISOString();
-    } else {
-      // Auto-add new custom item to Stockroom registry with 0 quantity!
-      const newStockItem = createItem(orderItem.name, 0);
-      items.push(newStockItem);
     }
   });
 
@@ -994,7 +1089,17 @@ finalizeOrderBtn.addEventListener('click', () => {
 });
 
 // ---------- Interactive Price & Quantity Input Modal ----------
+function ensureActiveSupplierBillDraft() {
+  if (!activeSupplierBillDraft) {
+    activeSupplierBillDraft = { items: [] };
+    editingSupplierBillId = null;
+    renderSupplierBillDraft();
+  }
+  return activeSupplierBillDraft;
+}
+
 function openPriceQtyModal(itemName) {
+  modalContext = (currentTabId === 'suppliers') ? 'supplier' : 'customer';
   modalSelectedItemName = itemName;
   modalItemName.textContent = itemName;
   modalPrice.value = '';
@@ -1009,28 +1114,40 @@ function openPriceQtyModal(itemName) {
   }
   
   if (modalContext === 'supplier') {
+    if (!selectedSupplierId) {
+      showToast('Please select a supplier first', true);
+      closePriceQtyModal();
+      return;
+    }
+
+    ensureActiveSupplierBillDraft();
+    modalItemName.textContent = itemName;
     modalPriceLabel.innerHTML = 'Unit Cost';
     modalAddBtn.textContent = 'Add to Bill';
 
-    const sup = suppliers.find(s => s.id === selectedSupplierId);
-    let suggestedPrice = null;
-    if (sup && sup.bills) {
-      for (let i = sup.bills.length - 1; i >= 0; i--) {
-        const matchItem = sup.bills[i].items.find(item => item.name.toLowerCase() === itemName.toLowerCase());
-        if (matchItem) {
-          suggestedPrice = matchItem.price;
-          break;
-        }
+    let suggestedPrice = findSupplierLastCost(selectedSupplierId, itemName);
+    let isSpecificSupplier = suggestedPrice !== null;
+
+    if (suggestedPrice === null) {
+      const generalBuyingPrice = findBuyingPrice(itemName);
+      if (generalBuyingPrice > 0) {
+        suggestedPrice = generalBuyingPrice;
       }
     }
 
     if (suggestedPrice !== null) {
       modalPrice.value = suggestedPrice;
-      modalPriceLabel.innerHTML = `Unit Cost <span class="mono" style="color: var(--rust-dark); font-weight:700; font-size:12px;">(Suggested: ${suggestedPrice.toFixed(2)})</span>`;
+      const originLabel = isSpecificSupplier ? 'Suggested' : 'Last Cost';
+      modalPriceLabel.innerHTML = `Unit Cost <span class="mono" style="color: var(--rust-dark); font-weight:700; font-size:12px;">(${originLabel}: ${suggestedPrice.toFixed(2)})</span>`;
     } else {
       modalPriceLabel.innerHTML = 'Unit Cost';
     }
   } else {
+    // Show buying cost next to item name in customer order modal
+    const buyingPrice = findBuyingPrice(itemName);
+    const buyingPriceStr = buyingPrice > 0 ? ` <span class="mono" style="color: var(--muted); font-size: 13px; margin-left: 8px;">(Buying Cost: ${buyingPrice.toFixed(2)})</span>` : ' <span class="mono" style="color: var(--muted); font-size: 13px; margin-left: 8px;">(Buying Cost: N/A)</span>';
+    modalItemName.innerHTML = `${escapeHtml(itemName)}${buyingPriceStr}`;
+
     modalAddBtn.textContent = 'Add to Order';
     // Look up customer previous price suggestion
     if (activeOrder) {
@@ -1080,12 +1197,17 @@ function handleModalSubmit() {
     return;
   }
 
+  // Auto-add new custom item name to Stockroom inventory registry if not present
+  ensureItemExistsInStock(modalSelectedItemName, 0);
+
   if (modalContext === 'supplier') {
-    if (!activeSupplierBillDraft) {
-      showToast('No active supply bill draft. Please start one first.', true);
+    if (!selectedSupplierId) {
+      showToast('Please select a supplier first', true);
       closePriceQtyModal();
       return;
     }
+
+    ensureActiveSupplierBillDraft();
 
     const existingIdx = activeSupplierBillDraft.items.findIndex(i => i.name.toLowerCase() === modalSelectedItemName.toLowerCase());
     
@@ -1418,7 +1540,6 @@ function renderSupplierList() {
   suppliersListContainer.innerHTML = '';
 
   let totalOwed = 0;
-  let totalAdvance = 0;
 
   if (suppliers.length === 0) {
     suppliersListContainer.innerHTML = `
@@ -1428,22 +1549,18 @@ function renderSupplierList() {
       </div>`;
     supplierStatCount.textContent = '0';
     supplierStatOwed.textContent = '0.00';
-    supplierStatAdvance.textContent = '0.00';
     return;
   }
 
   suppliers.forEach(sup => {
     const totalPurchased = sup.bills ? sup.bills.reduce((sum, b) => sum + Number(b.total || 0), 0) : 0;
-    const totalPaid = sup.payments ? sup.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) : 0;
-    const balance = totalPurchased - totalPaid;
+    const billsWithBalances = getSupplierBillsWithBalances(sup);
+    const outstandingBalance = billsWithBalances.reduce((sum, b) => sum + Number(b.remaining || 0), 0);
 
     let balanceHtml = '';
-    if (balance > 0) {
-      balanceHtml = `<span class="balance-owed">${balance.toFixed(2)}</span>`;
-      totalOwed += balance;
-    } else if (balance < 0) {
-      balanceHtml = `<span class="balance-advance">${Math.abs(balance).toFixed(2)} Adv</span>`;
-      totalAdvance += Math.abs(balance);
+    if (outstandingBalance > 0) {
+      balanceHtml = `<span class="balance-owed">${outstandingBalance.toFixed(2)}</span>`;
+      totalOwed += outstandingBalance;
     } else {
       balanceHtml = `<span class="balance-zero">0.00</span>`;
     }
@@ -1465,7 +1582,6 @@ function renderSupplierList() {
 
   supplierStatCount.textContent = suppliers.length;
   supplierStatOwed.textContent = totalOwed.toFixed(2);
-  supplierStatAdvance.textContent = totalAdvance.toFixed(2);
 }
 
 function renderSupplierDetail() {
@@ -1484,17 +1600,20 @@ function renderSupplierDetail() {
 
   const billed = sup.bills ? sup.bills.reduce((sum, b) => sum + Number(b.total || 0), 0) : 0;
   const paid = sup.payments ? sup.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) : 0;
+  const billsWithBalances = getSupplierBillsWithBalances(sup);
+  const outstandingBalance = billsWithBalances.reduce((sum, bill) => sum + Number(bill.remaining || 0), 0);
   const balance = billed - paid;
 
   supplierDetailBilled.textContent = billed.toFixed(2);
   supplierDetailPaid.textContent = paid.toFixed(2);
 
   supplierDetailBalance.className = 'num mono';
-  if (balance > 0) {
-    supplierDetailBalance.textContent = balance.toFixed(2);
+
+  if (outstandingBalance > 0) {
+    supplierDetailBalance.textContent = outstandingBalance.toFixed(2);
     supplierDetailBalance.classList.add('balance-owed');
-  } else if (balance < 0) {
-    supplierDetailBalance.textContent = `${Math.abs(balance).toFixed(2)} (Adv)`;
+  } else if (outstandingBalance < 0) {
+    supplierDetailBalance.textContent = `${Math.abs(outstandingBalance).toFixed(2)} (Adv)`;
     supplierDetailBalance.classList.add('balance-advance');
   } else {
     supplierDetailBalance.textContent = '0.00';
@@ -1511,21 +1630,36 @@ function renderSupplierDetail() {
         <div>No bills generated yet.</div>
       </div>`;
   } else {
-    sup.bills.forEach(bill => {
+    const billsWithBalances = getSupplierBillsWithBalances(sup);
+    billsWithBalances.forEach(bill => {
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.style.gridTemplateColumns = '1fr 120px 100px 100px';
       const dateStr = new Date(bill.date).toLocaleString(undefined, {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       });
+      const itemsDetail = bill.items.map(i => `${escapeHtml(i.name)} (${i.qty} x ${Number(i.price).toFixed(2)})`).join(', ');
+      
+      const remainingVal = Number(bill.remaining !== undefined ? bill.remaining : bill.total);
+      const isPaid = remainingVal <= 0;
+      const remainingHtml = isPaid 
+        ? `<br><span style="color: #2F855A; font-size: 11px; font-weight: bold;">✓ Paid</span>`
+        : `<br><span style="color: var(--rust-dark); font-size: 11px;">Unpaid: ${remainingVal.toFixed(2)}</span>`;
+
+      row.style.gridTemplateColumns = '2fr 1fr 1fr 100px';
       row.innerHTML = `
-        <div class="mono" style="font-size: 13px; color: var(--text);">${dateStr}</div>
-        <div style="font-size: 13.5px; color: var(--muted);">${bill.items.length} items</div>
-        <div class="mono" style="text-align: right; font-weight: 700; color: var(--rust-dark);">${Number(bill.total || 0).toFixed(2)}</div>
-        <div style="display: flex; gap: 4px; justify-content: flex-end;">
+        <div style="display: flex; flex-direction: column;">
+          <div class="mono" style="font-size: 13px; color: var(--text); font-weight: 600;">${dateStr}</div>
+          <div style="font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.4;">${itemsDetail}</div>
+        </div>
+        <div style="font-size: 13px; color: var(--muted); align-self: center; text-align: center;">${bill.items.length} items</div>
+        <div class="mono" style="text-align: right; font-weight: 700; color: var(--rust-dark); align-self: center;">
+          ${Number(bill.total || 0).toFixed(2)}
+          ${remainingHtml}
+        </div>
+        <div style="display: flex; gap: 4px; justify-content: flex-end; align-self: center;">
           <button class="add-btn" data-role="edit-sbill" data-id="${bill.id}" style="padding: 4px 8px; font-size: 10px; height: auto; background: var(--ink);">Edit</button>
           <button class="remove-btn" data-role="delete-sbill" data-id="${bill.id}" style="padding: 4px 8px; font-size: 10px; height: auto; width: auto;">Del</button>
         </div>
@@ -1545,16 +1679,19 @@ function renderSupplierDetail() {
     sup.payments.forEach(pay => {
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.style.gridTemplateColumns = '1fr 100px';
+      row.style.gridTemplateColumns = '1fr 130px';
       const dateStr = new Date(pay.date).toLocaleString(undefined, {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       });
+      const isRefund = Number(pay.amount || 0) < 0;
+      const amtColor = isRefund ? '#C53030' : '#2F855A';
+      const amtLabel = isRefund ? `${Number(pay.amount).toFixed(2)} (Refund)` : Number(pay.amount).toFixed(2);
       row.innerHTML = `
         <div class="mono" style="font-size: 13px; color: var(--text);">${dateStr}</div>
-        <div class="mono" style="text-align: right; font-weight: 700; color: #2F855A;">${Number(pay.amount || 0).toFixed(2)}</div>
+        <div class="mono" style="text-align: right; font-weight: 700; color: ${amtColor};">${amtLabel}</div>
       `;
       supplierPaymentsHistoryList.appendChild(row);
     });
@@ -1564,8 +1701,8 @@ function renderSupplierDetail() {
 if (supplierPayBtn) {
   supplierPayBtn.addEventListener('click', () => {
     const amount = parseFloat(supplierPayAmount.value);
-    if (isNaN(amount) || amount <= 0) {
-      showToast('Please enter a valid payment amount', true);
+    if (isNaN(amount) || amount === 0) {
+      showToast('Please enter a valid payment amount (non-zero)', true);
       supplierPayAmount.focus();
       return;
     }
@@ -1580,7 +1717,7 @@ if (supplierPayBtn) {
     saveSuppliers();
     supplierPayAmount.value = '';
     renderSuppliers();
-    showToast('Payment recorded');
+    showToast(amount > 0 ? 'Payment applied to supplier bill' : 'Refund/Return recorded');
   });
 }
 
@@ -1739,8 +1876,11 @@ if (supplierBillSearch) {
       matches.forEach(item => {
         const div = document.createElement('div');
         div.className = 'suggestion-item';
+        const supCost = findSupplierLastCost(selectedSupplierId, item.name);
+        const lastCost = supCost !== null ? supCost : findBuyingPrice(item.name);
+        const costStr = lastCost > 0 ? ` <span class="mono" style="color: var(--muted); font-size: 11px; margin-left: 8px;">(Last Cost: ${lastCost.toFixed(2)})</span>` : '';
         div.innerHTML = `
-          <span style="font-weight: 500;">${escapeHtml(item.name)}</span>
+          <span style="font-weight: 500;">${escapeHtml(item.name)}${costStr}</span>
           <span class="suggestion-qty">Qty: ${item.qty}</span>
         `;
         div.addEventListener('click', () => {
@@ -2065,12 +2205,72 @@ if (expenseBackBtn) {
 
 // ---------- TAB 10: Profit Tab ----------
 
+function ensureItemExistsInStock(name, initialQty = 0) {
+  const nameKey = name.trim().toLowerCase();
+  const exists = items.some(i => i.name.toLowerCase() === nameKey);
+  if (!exists) {
+    const newItem = createItem(name.trim(), initialQty);
+    items.push(newItem);
+    saveItems();
+    if (typeof renderItems === 'function') renderItems();
+  }
+}
+
 function getLocalDateString(dateInput) {
   const d = new Date(dateInput);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function getSupplierBillsWithBalances(sup) {
+  if (!sup || !sup.bills) return [];
+  // Clone bills and initialize remaining unpaid balance to the total amount
+  const bills = sup.bills.map(b => ({ ...b, remaining: Number(b.total || 0) }));
+  
+  // Total payments logged (positive = paid to supplier, negative = refund received)
+  const totalPaid = sup.payments ? sup.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) : 0;
+  
+  let pool = totalPaid;
+  if (pool > 0) {
+    // Sort bills chronologically (oldest first) to apply FIFO deduction
+    const sortedBills = [...bills].sort((a, b) => new Date(a.date) - new Date(b.date));
+    sortedBills.forEach(bill => {
+      if (pool <= 0) return;
+      const deduction = Math.min(bill.remaining, pool);
+      bill.remaining -= deduction;
+      pool -= deduction;
+    });
+    // Sync the remaining balance back to our main mapped array
+    sortedBills.forEach(sb => {
+      const match = bills.find(b => b.id === sb.id);
+      if (match) {
+        match.remaining = sb.remaining;
+      }
+    });
+  }
+  return bills;
+}
+
+function findSupplierLastCost(supplierId, itemName) {
+  const sup = suppliers.find(s => s.id === supplierId);
+  if (sup && sup.bills) {
+    let latestPrice = null;
+    let latestDate = null;
+    sup.bills.forEach(bill => {
+      const matched = bill.items.find(item => item.name.toLowerCase() === itemName.toLowerCase());
+      if (matched) {
+        const billDate = new Date(bill.date);
+        if (latestDate === null || billDate > latestDate) {
+          latestDate = billDate;
+          latestPrice = matched.price;
+        }
+      }
+    });
+    if (latestPrice !== null) return latestPrice;
+  }
+  return null;
 }
 
 function findBuyingPrice(itemName) {
@@ -2090,7 +2290,105 @@ function findBuyingPrice(itemName) {
       });
     }
   });
+
+  if (latestPrice === 0) {
+    const nameKey = itemName.toLowerCase().trim();
+    if (manualBuyingPrices && manualBuyingPrices[nameKey] !== undefined) {
+      return Number(manualBuyingPrices[nameKey]);
+    }
+  }
   return latestPrice;
+}
+
+function hasSupplierBuyingPrice(itemName) {
+  let hasPrice = false;
+  suppliers.forEach(sup => {
+    if (sup.bills) {
+      sup.bills.forEach(bill => {
+        const matched = bill.items.find(item => item.name.toLowerCase() === itemName.toLowerCase());
+        if (matched && matched.price > 0) {
+          hasPrice = true;
+        }
+      });
+    }
+  });
+  return hasPrice;
+}
+
+function getMissingBuyingPriceItems(soldItems) {
+  const missing = [];
+  Object.keys(soldItems).forEach(nameKey => {
+    const itemObj = soldItems[nameKey];
+    const nameKeyLower = itemObj.name.toLowerCase().trim();
+    const manualCost = manualBuyingPrices[nameKeyLower] !== undefined ? Number(manualBuyingPrices[nameKeyLower]) : 0;
+    const hasKnownCost = manualCost > 0 || hasSupplierBuyingPrice(itemObj.name);
+    if (!hasKnownCost) {
+      missing.push(itemObj);
+    }
+  });
+  return missing;
+}
+
+function renderProfitBreakdownOnly(soldItems) {
+  profitBreakdownList.innerHTML = '';
+  const soldItemsArr = Object.values(soldItems);
+  if (soldItemsArr.length === 0) {
+    profitBreakdownList.innerHTML = `
+      <div class="empty-state">
+        <div class="glyph">📈</div>
+        <div>No sales recorded for this date.</div>
+      </div>`;
+  } else {
+    soldItemsArr.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.style.gridTemplateColumns = '2fr 1fr 1fr 1fr';
+      row.innerHTML = `
+        <div style="font-weight: 600; color: var(--text);">${escapeHtml(item.name)}</div>
+        <div class="mono" style="font-size: 14px;">${item.qtySold}</div>
+        <div class="mono" style="font-size: 14px;">${item.sellingPrice.toFixed(2)}</div>
+        <div class="mono" style="text-align: right; font-weight: 600; color: var(--muted);">${item.buyingPrice.toFixed(2)}</div>
+      `;
+      profitBreakdownList.appendChild(row);
+    });
+  }
+}
+
+function recalculateProfitStats(soldItems, targetDate) {
+  let totalRevenue = 0;
+  let totalCost = 0;
+  let pendingPrices = false;
+
+  Object.keys(soldItems).forEach(nameKey => {
+    const itemObj = soldItems[nameKey];
+    const nameKeyLower = itemObj.name.toLowerCase().trim();
+    const manualCost = manualBuyingPrices[nameKeyLower] !== undefined ? Number(manualBuyingPrices[nameKeyLower]) : 0;
+    const unitCost = manualCost > 0 ? manualCost : findBuyingPrice(itemObj.name);
+    const hasKnownCost = unitCost > 0 || hasSupplierBuyingPrice(itemObj.name) || manualCost > 0;
+    if (!hasKnownCost) {
+      pendingPrices = true;
+    }
+    itemObj.buyingPrice = unitCost;
+    itemObj.cost = unitCost * itemObj.qtySold;
+
+    totalRevenue += itemObj.revenue;
+    totalCost += itemObj.cost;
+  });
+
+  const grossProfit = totalRevenue - totalCost;
+
+  profitStatRevenue.textContent = totalRevenue.toFixed(2);
+  profitStatCost.textContent = totalCost.toFixed(2);
+  if (pendingPrices) {
+    profitStatGross.textContent = 'Pending';
+    profitStatGross.style.color = 'var(--rust-dark)';
+  } else {
+    profitStatGross.textContent = grossProfit.toFixed(2);
+    profitStatGross.style.color = 'var(--rust-dark)';
+  }
+
+  updateNetProfitCalculation(pendingPrices ? null : grossProfit);
+  renderProfitBreakdownOnly(soldItems);
 }
 
 function renderProfit() {
@@ -2119,24 +2417,60 @@ function renderProfit() {
     }
   });
 
-  let totalRevenue = 0;
-  let totalCost = 0;
+  const missingPricesList = getMissingBuyingPriceItems(soldItems);
 
-  Object.keys(soldItems).forEach(nameKey => {
-    const itemObj = soldItems[nameKey];
-    const unitCost = findBuyingPrice(itemObj.name);
-    itemObj.buyingPrice = unitCost;
-    itemObj.cost = unitCost * itemObj.qtySold;
+  const missingPricesSection = document.getElementById('profitMissingPricesSection');
+  const missingPricesListContainer = document.getElementById('profitMissingPricesList');
 
-    totalRevenue += itemObj.revenue;
-    totalCost += itemObj.cost;
-  });
+  if (missingPricesList.length > 0) {
+    missingPricesSection.style.display = 'block';
+    missingPricesListContainer.innerHTML = '';
+    missingPricesList.forEach(item => {
+      const nameKey = item.name.toLowerCase().trim();
+      const currentManualPrice = manualBuyingPrices[nameKey] !== undefined ? manualBuyingPrices[nameKey] : '';
+      
+      const div = document.createElement('div');
+      div.className = 'add-form';
+      div.style.alignItems = 'center';
+      div.style.gap = '12px';
+      div.style.marginTop = '0';
+      div.innerHTML = `
+        <div style="flex: 2; font-weight: 600; color: var(--text);">${escapeHtml(item.name)}</div>
+        <div class="field" style="flex: 1; margin: 0;">
+          <label style="font-size: 11px;">Buying Price</label>
+          <input type="number" step="0.01" min="0" placeholder="0.00" value="${currentManualPrice}" data-name="${nameKey}" class="missing-price-input" style="width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13.5px; background: var(--paper-raised);">
+        </div>
+      `;
 
-  const grossProfit = totalRevenue - totalCost;
+      const input = div.querySelector('.missing-price-input');
+      input.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val >= 0) {
+          manualBuyingPrices[nameKey] = val;
+        } else {
+          manualBuyingPrices[nameKey] = 0;
+        }
+        saveManualBuyingPrices();
+        recalculateProfitStats(soldItems, targetDate);
+      });
 
-  profitStatRevenue.textContent = totalRevenue.toFixed(2);
-  profitStatCost.textContent = totalCost.toFixed(2);
-  profitStatGross.textContent = grossProfit.toFixed(2);
+      missingPricesListContainer.appendChild(div);
+    });
+  } else {
+    missingPricesSection.style.display = 'none';
+  }
+
+  if (missingPricesList.length > 0) {
+    profitStatRevenue.textContent = '0.00';
+    profitStatCost.textContent = '0.00';
+    profitStatGross.textContent = 'Pending';
+    profitStatExpenses.textContent = '0.00';
+    profitStatNet.textContent = 'Pending';
+    renderProfitBreakdownOnly({});
+    return;
+  }
+
+  recalculateProfitStats(soldItems, targetDate);
 
   profitExpenseSelector.innerHTML = '';
   if (expenses.length === 0) {
@@ -2159,31 +2493,6 @@ function renderProfit() {
       profitExpenseSelector.appendChild(div);
     });
   }
-
-  updateNetProfitCalculation(grossProfit);
-
-  profitBreakdownList.innerHTML = '';
-  const soldItemsArr = Object.values(soldItems);
-  if (soldItemsArr.length === 0) {
-    profitBreakdownList.innerHTML = `
-      <div class="empty-state">
-        <div class="glyph">📈</div>
-        <div>No sales recorded for this date.</div>
-      </div>`;
-  } else {
-    soldItemsArr.forEach(item => {
-      const row = document.createElement('div');
-      row.className = 'item-row';
-      row.style.gridTemplateColumns = '2fr 1fr 1fr 1fr';
-      row.innerHTML = `
-        <div style="font-weight: 600; color: var(--text);">${escapeHtml(item.name)}</div>
-        <div class="mono" style="font-size: 14px;">${item.qtySold}</div>
-        <div class="mono" style="font-size: 14px;">${item.sellingPrice.toFixed(2)}</div>
-        <div class="mono" style="text-align: right; font-weight: 600; color: var(--muted);">${item.buyingPrice.toFixed(2)}</div>
-      `;
-      profitBreakdownList.appendChild(row);
-    });
-  }
 }
 
 function updateNetProfitCalculation(grossProfit) {
@@ -2193,6 +2502,11 @@ function updateNetProfitCalculation(grossProfit) {
       deductedExpenses += parseFloat(chk.dataset.amount || 0);
     }
   });
+  if (grossProfit === null || Number.isNaN(grossProfit)) {
+    profitStatExpenses.textContent = deductedExpenses.toFixed(2);
+    profitStatNet.textContent = 'Pending';
+    return;
+  }
   const netProfit = grossProfit - deductedExpenses;
 
   profitStatExpenses.textContent = deductedExpenses.toFixed(2);
@@ -2209,7 +2523,8 @@ if (calculateProfitBtn) {
 if (profitExpenseSelector) {
   profitExpenseSelector.addEventListener('change', (e) => {
     if (e.target && e.target.type === 'checkbox') {
-      const gross = parseFloat(profitStatGross.textContent || 0);
+      const grossText = profitStatGross.textContent;
+      const gross = grossText === 'Pending' ? null : parseFloat(grossText || 0);
       updateNetProfitCalculation(gross);
     }
   });
@@ -2240,6 +2555,7 @@ function initBackupTab() {
             customers: JSON.parse(window.localStorage.getItem(CUSTOMERS_STORAGE_KEY) || '[]'),
             suppliers: JSON.parse(window.localStorage.getItem(SUPPLIERS_STORAGE_KEY) || '[]'),
             expenses: JSON.parse(window.localStorage.getItem(EXPENSES_STORAGE_KEY) || '[]'),
+            manualPrices: JSON.parse(window.localStorage.getItem(MANUAL_PRICES_STORAGE_KEY) || '{}'),
             prepClearedAt: window.localStorage.getItem(PREP_CLEARED_STORAGE_KEY)
           }
         };
@@ -2319,6 +2635,7 @@ function initBackupTab() {
           if (d.customers) window.localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(d.customers));
           if (d.suppliers) window.localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(d.suppliers));
           if (d.expenses) window.localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(d.expenses));
+          if (d.manualPrices) window.localStorage.setItem(MANUAL_PRICES_STORAGE_KEY, JSON.stringify(d.manualPrices));
           if (d.prepClearedAt) {
             window.localStorage.setItem(PREP_CLEARED_STORAGE_KEY, d.prepClearedAt);
           } else {

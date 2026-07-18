@@ -111,7 +111,14 @@
         </div>
       </div>
       
-      <div class="ledger" style="margin-top: 22px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 22px; gap: 10px; flex-wrap: wrap;">
+        <h3 style="font-size: 16px; margin: 0; color: var(--ink);">Recent Orders</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="clearCustomersBtn" class="remove-btn" style="padding: 6px 12px; font-size: 12px; height: auto; width: auto; margin: 0;">Clear Customers</button>
+          <button id="clearOrderHistoryBtn" class="remove-btn" style="padding: 6px 12px; font-size: 12px; height: auto; width: auto; margin: 0;">Clear Order History</button>
+        </div>
+      </div>
+      <div class="ledger" style="margin-top: 10px;">
         <div class="ledger-head" style="grid-template-columns: 1fr 180px 100px;">
           <span>Recent Customer</span>
           <span>Date & Time</span>
@@ -234,11 +241,7 @@
           </div>
           <div class="stat-card">
             <div class="num mono" id="supplierStatOwed">0.00</div>
-            <div class="lbl">Total Owed</div>
-          </div>
-          <div class="stat-card">
-            <div class="num mono" id="supplierStatAdvance">0.00</div>
-            <div class="lbl">Total Advance</div>
+            <div class="lbl">Money Owed</div>
           </div>
         </div>
 
@@ -303,8 +306,8 @@
             <div class="add-bar-title">Log a Payment</div>
             <div class="add-form" style="margin-top: 10px;">
               <div class="field" style="flex: 1;">
-                <label for="supplier-pay-amount">Amount Paid</label>
-                <input type="number" id="supplier-pay-amount" min="0.01" step="0.01" placeholder="0.00">
+                <label for="supplier-pay-amount">Amount Paid / Returned</label>
+                <input type="number" id="supplier-pay-amount" step="0.01" placeholder="0.00 (use negative for refund)">
               </div>
               <button class="add-btn" id="supplierPayBtn" style="background: var(--rust-dark);">Record Payment</button>
             </div>
