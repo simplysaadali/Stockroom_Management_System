@@ -1,0 +1,6 @@
+{
+  "appId": "com.stockroom.app",
+  "appName": "Stockroom",
+  "webDir": "public",
+  "bundledWebRuntime": false
+}

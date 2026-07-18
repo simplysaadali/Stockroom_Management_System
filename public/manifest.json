@@ -1,0 +1,16 @@
+{
+  "name": "Stockroom",
+  "short_name": "Stockroom",
+  "description": "Stockroom Inventory, Billing, and Finance",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#F7F5F0",
+  "theme_color": "#1C2321",
+  "icons": [
+    {
+      "src": "icon.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg"
+    }
+  ]
+}
