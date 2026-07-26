@@ -25,15 +25,12 @@
       <li class="nav-item" data-tab="orders"><span class="dot"></span>Orders</li>
       <li class="nav-item" data-tab="placed-items"><span class="dot"></span>Placed Items</li>
       <li class="nav-item" data-tab="load-lists"><span class="dot"></span>Load Lists</li>
-      <li class="nav-item" data-tab="suppliers"><span class="dot"></span>Suppliers</li>
     </ul>
 
     <div class="nav-label" style="margin-top:22px;">Finance</div>
     <ul class="nav-list">
       <li class="nav-item" data-tab="billing"><span class="dot"></span>Billing</li>
       <li class="nav-item" data-tab="receipts"><span class="dot"></span>Receipts</li>
-      <li class="nav-item" data-tab="customers"><span class="dot"></span>Customers</li>
-      <li class="nav-item" data-tab="expenses"><span class="dot"></span>Daily Expenses</li>
       <li class="nav-item" data-tab="profit"><span class="dot"></span>Profit</li>
     </ul>
 
@@ -71,10 +68,16 @@
         </div>
       </div>
 
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 22px; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+        <h3 style="font-size: 16px; margin: 0; color: var(--ink);">Stock Items</h3>
+        <button id="clearAllItemsBtn" class="remove-btn" style="padding: 6px 12px; font-size: 12px; height: auto; width: auto; margin: 0; background: var(--danger); color: white; border: none; border-radius: 6px;">Clear All Items</button>
+      </div>
+
       <div class="ledger">
-        <div class="ledger-head">
+        <div class="ledger-head" style="grid-template-columns: 56px 1fr 130px 190px 80px;">
           <span>Code</span>
           <span>Item name</span>
+          <span>Buying Price</span>
           <span>Quantity</span>
           <span></span>
         </div>
@@ -88,7 +91,11 @@
             <label for="new-name">Item name</label>
             <input type="text" id="new-name" placeholder="e.g. Packing tape">
           </div>
-          <div class="field">
+          <div class="field" style="width:120px;">
+            <label for="new-price">Buying Price</label>
+            <input type="number" id="new-price" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="field" style="width:100px;">
             <label for="new-qty">Quantity</label>
             <input type="number" id="new-qty" placeholder="0" min="0" step="1">
           </div>
@@ -130,6 +137,10 @@
 
     <!-- Tab 3: Placed Items -->
     <div id="tab-placed-items" class="tab-pane">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+        <h3 style="font-size: 16px; margin: 0; color: var(--ink);">Placed Items (Active Order)</h3>
+        <button id="clearPlacedItemsBtn" class="remove-btn" style="padding: 6px 12px; font-size: 12px; height: auto; width: auto; margin: 0; background: var(--danger); color: white; border: none; border-radius: 6px;">Clear Placed Items</button>
+      </div>
       <div class="ledger">
         <div class="ledger-head" style="grid-template-columns: 1fr 140px 140px;">
           <span>Item Name</span>
@@ -221,267 +232,6 @@
       </div>
     </div>
 
-    <!-- Tab 7: Customers -->
-    <div id="tab-customers" class="tab-pane">
-      <div class="ledger">
-        <div class="ledger-head" style="grid-template-columns: 200px 180px 1fr 100px;">
-          <span>Customer Name</span>
-          <span>Last Order Date</span>
-          <span>Preferred Pricing History</span>
-          <span style="text-align: right; padding-right: 12px;">Action</span>
-        </div>
-        <div id="customersListContainer"></div>
-      </div>
-    </div>
-
-    <!-- Tab 8: Suppliers -->
-    <div id="tab-suppliers" class="tab-pane">
-      <!-- View 1: Suppliers List (displayed by default) -->
-      <div id="supplier-list-view">
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="num mono" id="supplierStatCount">0</div>
-            <div class="lbl">Total Suppliers</div>
-          </div>
-          <div class="stat-card">
-            <div class="num mono" id="supplierStatOwed">0.00</div>
-            <div class="lbl">Total Owed</div>
-          </div>
-        </div>
-
-        <div class="ledger" style="margin-top: 22px;">
-          <div class="ledger-head" style="grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 100px;">
-            <span>Supplier Name</span>
-            <span>Contact Details</span>
-            <span>Total Purchased</span>
-            <span>Balance</span>
-            <span style="text-align: right;">Action</span>
-          </div>
-          <div id="suppliersListContainer"></div>
-        </div>
-
-        <div class="add-bar" style="margin-top: 22px;">
-          <div class="add-bar-title">Add a New Supplier</div>
-          <div class="add-form">
-            <div class="field" style="flex: 2; min-width: 200px;">
-              <label for="sup-new-name">Supplier Name</label>
-              <input type="text" id="sup-new-name" placeholder="e.g. Acme Wholesale">
-            </div>
-            <div class="field" style="flex: 1.5; min-width: 150px;">
-              <label for="sup-new-contact">Contact Details (Phone/Email)</label>
-              <input type="text" id="sup-new-contact" placeholder="e.g. +1 555-0199">
-            </div>
-            <button class="add-btn" id="supAddBtn"><span class="plus">+</span>Add Supplier</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- View 2: Supplier Detail View (hidden by default) -->
-      <div id="supplier-detail-view" style="display: none;">
-        <div style="margin-bottom: 22px;">
-          <button class="remove-btn" id="supplierBackBtn" style="width: auto; padding: 0 16px; height: 38px; background: var(--paper-raised); border-color: var(--line); color: var(--muted); font-size: 14px; font-weight: 500;">← Back to Suppliers</button>
-        </div>
-
-        <div class="add-bar" style="border-style: solid; border-color: var(--line); margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div class="add-bar-title" style="margin-bottom: 2px;">Active Supplier</div>
-            <div id="supplier-detail-name" style="font-size: 20px; font-weight: 700; color: var(--ink);">Supplier Name</div>
-            <div id="supplier-detail-contact" style="font-size: 13px; color: var(--muted);">Contact details</div>
-          </div>
-          <div class="stats-row" style="margin: 0; gap: 10px; min-width: 400px; flex: 1; justify-content: flex-end;">
-            <div class="stat-card" style="padding: 10px 14px; min-width: 90px;">
-              <div class="lbl" style="font-size: 11px;">Billed</div>
-              <div class="num mono" id="supplier-detail-billed" style="font-size: 15px; margin-top: 2px;">0.00</div>
-            </div>
-            <div class="stat-card" style="padding: 10px 14px; min-width: 90px;">
-              <div class="lbl" style="font-size: 11px;">Paid</div>
-              <div class="num mono" id="supplier-detail-paid" style="font-size: 15px; margin-top: 2px;">0.00</div>
-            </div>
-            <div class="stat-card" style="padding: 10px 14px; min-width: 90px;">
-              <div class="lbl" style="font-size: 11px;">Balance</div>
-              <div class="num mono" id="supplier-detail-balance" style="font-size: 15px; margin-top: 2px;">0.00</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px;">
-          <!-- Log Payment Section -->
-          <div class="add-bar" style="border-style: solid; border-color: var(--line); margin-bottom: 0;">
-            <div class="add-bar-title">Log a Payment</div>
-            <div class="add-form" style="margin-top: 10px;">
-              <div class="field" style="flex: 1;">
-                <label for="supplier-pay-amount">Amount Paid / Returned</label>
-                <input type="number" id="supplier-pay-amount" step="0.01" placeholder="0.00 (use negative for refund)">
-              </div>
-              <button class="add-btn" id="supplierPayBtn" style="background: var(--rust-dark);">Record Payment</button>
-            </div>
-          </div>
-
-          <!-- Start New Bill Section -->
-          <div class="add-bar" style="border-style: solid; border-color: var(--line); display: flex; align-items: center; justify-content: center; margin-bottom: 0;">
-            <button class="add-btn" id="supplierNewBillBtn" style="font-size: 15px; padding: 14px 28px; width: 100%; justify-content: center;">
-              <span class="plus">+</span> Create New Supply Bill
-            </button>
-          </div>
-        </div>
-
-        <!-- Supplier Bill Draft Builder -->
-        <div id="supplier-bill-draft-wrap" class="add-bar" style="border-style: solid; border-color: var(--rust); margin-bottom: 22px; display: none;">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div class="add-bar-title" id="supplier-draft-title" style="color: var(--rust-dark);">New Supply Bill Draft</div>
-            <button class="remove-btn" id="supplierCancelBillBtn" style="width: auto; padding: 0 12px; height: 32px; font-size: 12px;">Cancel Draft</button>
-          </div>
-
-          <div class="billing-search-section" style="margin-top: 15px;">
-            <div class="field" style="position: relative; width: 100%;">
-              <label for="supplier-bill-search">Search stockroom item or write custom name</label>
-              <div style="display:flex; gap:8px;">
-                <input type="text" id="supplier-bill-search" placeholder="Type item name..." style="width:100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14.5px; background: var(--paper-raised);" autocomplete="off">
-                <button class="add-btn" id="supplierBillAddCustomBtn" style="white-space: nowrap;">Add Custom</button>
-              </div>
-              <div id="supplier-search-suggestions" class="suggestions-box" style="display: none;"></div>
-            </div>
-          </div>
-
-          <div class="ledger" style="margin-top: 22px;">
-            <div class="ledger-head" style="grid-template-columns: 1fr 120px 120px 120px 50px;">
-              <span>Item Name</span>
-              <span>Unit Cost</span>
-              <span>Quantity</span>
-              <span style="text-align: right;">Total</span>
-              <span></span>
-            </div>
-            <div id="supplierBillItemsList"></div>
-            <div class="billing-total-row">
-              <div>Total Bill Amount:</div>
-              <div class="mono" id="supplier-bill-total-val" style="font-size: 20px; font-weight: 700; color: var(--rust-dark);">0.00</div>
-            </div>
-          </div>
-
-          <div style="margin-top: 22px; display: flex; justify-content: flex-end;">
-            <button class="add-btn" id="supplierFinalizeBillBtn" style="font-size: 15px; padding: 12px 24px; background: var(--rust-dark);">
-              ✓ Save Supplier Bill
-            </button>
-          </div>
-        </div>
-
-        <!-- History Lists -->
-        <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 22px;">
-          <div>
-            <h3 style="font-size: 16px; margin: 0 0 12px; color: var(--ink);">Bills (Supply Purchases)</h3>
-            <div class="ledger">
-              <div class="ledger-head" style="grid-template-columns: 1fr 120px 100px 100px;">
-                <span>Date & Time</span>
-                <span>Items Count</span>
-                <span style="text-align: right;">Total</span>
-                <span style="text-align: right;">Actions</span>
-              </div>
-              <div id="supplierBillsHistoryList"></div>
-            </div>
-          </div>
-
-          <div>
-            <h3 style="font-size: 16px; margin: 0 0 12px; color: var(--ink);">Payment History</h3>
-            <div class="ledger">
-              <div class="ledger-head" style="grid-template-columns: 1fr 100px;">
-                <span>Date & Time</span>
-                <span style="text-align: right;">Amount</span>
-              </div>
-              <div id="supplierPaymentsHistoryList"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab 9: Daily Expenses -->
-    <div id="tab-expenses" class="tab-pane">
-      <!-- View 1: Expense Lists View -->
-      <div id="expense-list-view">
-        <div class="stats-row">
-          <div class="stat-card">
-            <div class="num mono" id="expenseStatCount">0</div>
-            <div class="lbl">Expense Lists</div>
-          </div>
-          <div class="stat-card">
-            <div class="num mono" id="expenseStatTotal">0.00</div>
-            <div class="lbl">Total Expenses</div>
-          </div>
-        </div>
-
-        <div class="ledger" style="margin-top: 22px;">
-          <div class="ledger-head" style="grid-template-columns: 2fr 1fr 1fr 100px;">
-            <span>List Name</span>
-            <span>Date</span>
-            <span>Total Cost</span>
-            <span style="text-align: right;">Action</span>
-          </div>
-          <div id="expenseListsContainer"></div>
-        </div>
-
-        <div class="add-bar" style="margin-top: 22px;">
-          <div class="add-bar-title">Create a New Expense List</div>
-          <div class="add-form">
-            <div class="field" style="flex: 2; min-width: 200px;">
-              <label for="exp-new-name">Expense List Name</label>
-              <input type="text" id="exp-new-name" placeholder="e.g. Daily Tea & Fuel">
-            </div>
-            <div class="field" style="flex: 1.5; min-width: 150px;">
-              <label for="exp-new-date">Date</label>
-              <input type="date" id="exp-new-date">
-            </div>
-            <button class="add-btn" id="expAddBtn"><span class="plus">+</span>Create List</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- View 2: Expense List Detail View -->
-      <div id="expense-detail-view" style="display: none;">
-        <div style="margin-bottom: 22px;">
-          <button class="remove-btn" id="expenseBackBtn" style="width: auto; padding: 0 16px; height: 38px; background: var(--paper-raised); border-color: var(--line); color: var(--muted); font-size: 14px; font-weight: 500;">← Back to Lists</button>
-        </div>
-
-        <div class="add-bar" style="border-style: solid; border-color: var(--line); margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div class="add-bar-title" style="margin-bottom: 2px;">Expense List Detail</div>
-            <div id="expense-detail-name" style="font-size: 20px; font-weight: 700; color: var(--ink);">List Name</div>
-            <div id="expense-detail-date" style="font-size: 13px; color: var(--muted);">Date</div>
-          </div>
-          <div class="stats-row" style="margin: 0; gap: 10px;">
-            <div class="stat-card" style="padding: 10px 14px; min-width: 120px;">
-              <div class="lbl" style="font-size: 11px;">List Total</div>
-              <div class="num mono" id="expense-detail-total" style="font-size: 18px; margin-top: 2px;">0.00</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="add-bar" style="border-style: solid; border-color: var(--line); margin-bottom: 22px;">
-          <div class="add-bar-title">Add Expense Item</div>
-          <div class="add-form">
-            <div class="field" style="flex: 2; min-width: 200px;">
-              <label for="exp-item-name">Expense Description / Name</label>
-              <input type="text" id="exp-item-name" placeholder="e.g. Fuel for delivery van">
-            </div>
-            <div class="field" style="flex: 1; min-width: 100px;">
-              <label for="exp-item-price">Price / Cost</label>
-              <input type="number" id="exp-item-price" min="0.01" step="0.01" placeholder="0.00">
-            </div>
-            <button class="add-btn" id="expAddItemBtn" style="background: var(--rust-dark);"><span class="plus">+</span>Add Expense</button>
-          </div>
-        </div>
-
-        <h3 style="font-size: 16px; margin: 0 0 12px; color: var(--ink);">Expense Items</h3>
-        <div class="ledger">
-          <div class="ledger-head" style="grid-template-columns: 2fr 1fr 100px;">
-            <span>Expense Description</span>
-            <span>Price</span>
-            <span style="text-align: right;">Action</span>
-          </div>
-          <div id="expenseItemsContainer"></div>
-        </div>
-      </div>
-    </div>
-
     <!-- Tab 10: Profit -->
     <div id="tab-profit" class="tab-pane">
       <div class="add-bar" style="border-style: solid; border-color: var(--line); margin-bottom: 22px; display: flex; align-items: center; gap: 16px;">
@@ -510,41 +260,22 @@
           <div class="num mono" id="profitStatCost">0.00</div>
           <div class="lbl">Supply Cost</div>
         </div>
-        <div class="stat-card" style="border-color: var(--rust);">
-          <div class="num mono" id="profitStatGross" style="color: var(--rust-dark);">0.00</div>
-          <div class="lbl">Gross Profit</div>
-        </div>
-        <div class="stat-card">
-          <div class="num mono" id="profitStatExpenses">0.00</div>
-          <div class="lbl">Deducted Expenses</div>
-        </div>
         <div class="stat-card" style="background: var(--ink); color: #fff;">
           <div class="num mono" id="profitStatNet" style="color: #fff;">0.00</div>
           <div class="lbl" style="color: rgba(255,255,255,.6);">Net Profit</div>
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 22px; margin-top: 22px;">
-        <!-- Expense Lists Selection -->
-        <div>
-          <h3 style="font-size: 16px; margin: 0 0 12px; color: var(--ink);">Select Expense Lists to Deduct</h3>
-          <div class="ledger" style="padding: 14px; background: var(--paper-raised); display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto;" id="profitExpenseSelector">
-            <!-- Rendered dynamically -->
+      <div style="margin-top: 22px;">
+        <h3 style="font-size: 16px; margin: 0 0 12px; color: var(--ink);">Sales Breakdown</h3>
+        <div class="ledger">
+          <div class="ledger-head" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+            <span>Item</span>
+            <span>Qty</span>
+            <span>Sale Price</span>
+            <span style="text-align: right;">Cost (latest)</span>
           </div>
-        </div>
-
-        <!-- Sales breakdown for the day -->
-        <div>
-          <h3 style="font-size: 16px; margin: 0 0 12px; color: var(--ink);">Sales Breakdown</h3>
-          <div class="ledger">
-            <div class="ledger-head" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
-              <span>Item</span>
-              <span>Qty</span>
-              <span>Sale Price</span>
-              <span style="text-align: right;">Cost (latest)</span>
-            </div>
-            <div id="profitBreakdownList"></div>
-          </div>
+          <div id="profitBreakdownList"></div>
         </div>
       </div>
     </div>

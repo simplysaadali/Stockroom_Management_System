@@ -259,9 +259,6 @@ function switchTab(tabId) {
     renderBilling();
   }
   if (tabId === 'receipts') renderReceipts();
-  if (tabId === 'customers') renderCustomers();
-  if (tabId === 'suppliers') renderSuppliers();
-  if (tabId === 'expenses') renderExpenses();
   if (tabId === 'profit') {
     if (!profitDateInput.value) {
       profitDateInput.value = new Date().toISOString().split('T')[0];
@@ -305,6 +302,18 @@ function loadAllData(){
     prepClearedAt = window.localStorage.getItem(PREP_CLEARED_STORAGE_KEY) || null;
   } catch (err) {
     console.error('Failed to load data from localStorage', err);
+  }
+
+  // If no items in localStorage, load default items from JSON file
+  if (items.length === 0) {
+    fetch('data/items.json')
+      .then(r => r.json())
+      .then(data => {
+        items = data;
+        saveItems();
+        if (currentTabId === 'items') renderItems();
+      })
+      .catch(err => console.error('Failed to load default items', err));
   }
 }
 
@@ -380,11 +389,12 @@ function escapeHtml(str){
 }
 
 // ---------- TAB 1: Items Stockroom Inventory ----------
-function createItem(name, qty){
+function createItem(name, qty, price){
   return {
     _id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
     name: name || 'Untitled item',
     qty: Number.isFinite(Number(qty)) ? Math.max(0, Number(qty)) : 0,
+    price: Number.isFinite(Number(price)) ? Math.max(0, Number(price)) : 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -412,7 +422,7 @@ function renderItems(){
 
   if(items.length === 0){
     itemList.innerHTML = `
-      <div class="empty-state">
+      <div class="empty-state" style="grid-column: 1 / -1;">
         <div class="glyph">&#9723;</div>
         <div>No items yet — add your first one below.</div>
       </div>`;
@@ -421,12 +431,17 @@ function renderItems(){
       const row = document.createElement('div');
       row.className = 'item-row';
       row.dataset.id = item._id;
+      row.style.gridTemplateColumns = '56px 1fr 130px 190px 80px';
       const low = Number(item.qty) <= LOW_STOCK;
       row.innerHTML = `
         <div class="item-code mono">#${pad(idx + 1)}</div>
         <div class="item-name-wrap">
           <input class="item-name" type="text" value="${escapeHtml(item.name)}" data-role="name">
           <div class="item-sub">Saved locally</div>
+        </div>
+        <div class="item-price-wrap">
+          <span class="mobile-only-label">Buying Price:</span>
+          <input class="price-input mono" type="number" min="0" step="0.01" value="${item.price !== undefined ? item.price : 0}" data-role="price" style="width: 100px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 14.5px; background: var(--paper-raised); color: var(--text);">
         </div>
         <div>
           <div class="qty-control">
@@ -485,6 +500,14 @@ itemList.addEventListener('change', (e) => {
     showToast('Quantity saved');
   }
 
+  if(e.target.dataset.role === 'price'){
+    let val = parseFloat(e.target.value);
+    if(isNaN(val) || val < 0) val = 0;
+    updateItem(id, { price: val });
+    renderItems();
+    showToast('Price saved');
+  }
+
   if(e.target.dataset.role === 'name'){
     const val = e.target.value.trim();
     const finalName = val === '' ? 'Untitled item' : val;
@@ -496,6 +519,7 @@ itemList.addEventListener('change', (e) => {
 
 function addStockroomItem(){
   const name = newName.value.trim();
+  const priceVal = parseFloat(document.getElementById('new-price').value);
   const qty = parseInt(newQty.value, 10);
   if(name === ''){
     newName.focus();
@@ -504,19 +528,22 @@ function addStockroomItem(){
 
   const existingIdx = items.findIndex(i => i.name.toLowerCase() === name.toLowerCase());
   const addition = isNaN(qty) || qty < 0 ? 0 : qty;
+  const price = isNaN(priceVal) || priceVal < 0 ? 0 : priceVal;
   
   if (existingIdx !== -1) {
     items[existingIdx].qty = Number(items[existingIdx].qty || 0) + addition;
+    items[existingIdx].price = price;
     items[existingIdx].updatedAt = new Date().toISOString();
-    showToast(`Updated quantity for existing item: ${items[existingIdx].name}`);
+    showToast(`Updated quantity and price for existing item: ${items[existingIdx].name}`);
   } else {
-    const created = createItem(name, addition);
+    const created = createItem(name, addition, price);
     items.push(created);
     showToast('Item added to Stockroom');
   }
   
   saveItems();
   newName.value = '';
+  document.getElementById('new-price').value = '';
   newQty.value = '';
   renderItems();
   newName.focus();
@@ -525,6 +552,10 @@ function addStockroomItem(){
 addBtn.addEventListener('click', addStockroomItem);
 newQty.addEventListener('keydown', (e) => { if(e.key === 'Enter') addStockroomItem(); });
 newName.addEventListener('keydown', (e) => { if(e.key === 'Enter') addStockroomItem(); });
+const newPriceInputEl = document.getElementById('new-price');
+if (newPriceInputEl) {
+  newPriceInputEl.addEventListener('keydown', (e) => { if(e.key === 'Enter') addStockroomItem(); });
+}
 
 // ---------- TAB 2: Orders & Customers ----------
 startOrderBtn.addEventListener('click', () => {
@@ -567,14 +598,34 @@ function clearAllSalesHistory() {
   }
 }
 
-function clearAllCustomerProfiles() {
-  if (confirm('Delete all customer profiles and recent customer history?')) {
-    customers = [];
-    saveCustomers();
-    if (typeof renderCustomers === 'function') renderCustomers();
-    if (typeof renderOrders === 'function') renderOrders();
-    showToast('Customer profiles cleared');
-  }
+const clearAllItemsBtn = document.getElementById('clearAllItemsBtn');
+if (clearAllItemsBtn) {
+  clearAllItemsBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to delete all items in the stockroom? This will empty your inventory and cannot be undone.')) {
+      items = [];
+      saveItems();
+      renderItems();
+      showToast('All items cleared');
+    }
+  });
+}
+
+const clearPlacedItemsBtn = document.getElementById('clearPlacedItemsBtn');
+if (clearPlacedItemsBtn) {
+  clearPlacedItemsBtn.addEventListener('click', () => {
+    if (activeOrder) {
+      if (confirm(`Are you sure you want to cancel and clear the active order for ${activeOrder.customerName}?`)) {
+        const name = activeOrder.customerName;
+        activeOrder = null;
+        saveActiveOrder();
+        renderPlacedItems();
+        if (typeof renderBilling === 'function') renderBilling();
+        showToast(`Order for ${name} cleared`);
+      }
+    } else {
+      showToast('No active order to clear');
+    }
+  });
 }
 
 if (clearOrderHistoryBtn) {
@@ -582,9 +633,6 @@ if (clearOrderHistoryBtn) {
 }
 if (clearReceiptHistoryBtn) {
   clearReceiptHistoryBtn.addEventListener('click', clearAllSalesHistory);
-}
-if (clearCustomersBtn) {
-  clearCustomersBtn.addEventListener('click', clearAllCustomerProfiles);
 }
 
 // Customer autocomplete dropdown handler

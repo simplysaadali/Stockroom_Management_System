@@ -34,6 +34,11 @@ function ensureQty(value) {
   return Number.isFinite(qty) && qty >= 0 ? qty : 0;
 }
 
+function ensurePrice(value) {
+  const price = Number(value);
+  return Number.isFinite(price) && price >= 0 ? price : 0;
+}
+
 function generateId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -55,6 +60,7 @@ router.post('/', async (req, res) => {
       _id: generateId(),
       name: ensureString(req.body.name),
       qty: ensureQty(req.body.qty),
+      price: ensurePrice(req.body.price),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -78,6 +84,7 @@ router.patch('/:id', async (req, res) => {
       ...existing,
       name: req.body.name !== undefined ? ensureString(req.body.name, existing.name) : existing.name,
       qty: req.body.qty !== undefined ? ensureQty(req.body.qty) : existing.qty,
+      price: req.body.price !== undefined ? ensurePrice(req.body.price) : (existing.price !== undefined ? existing.price : 0),
       updatedAt: new Date().toISOString()
     };
 
@@ -87,6 +94,16 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(400).json({ error: err.message || 'Could not update item' });
+  }
+});
+
+router.delete('/', async (req, res) => {
+  try {
+    await saveItems([]);
+    res.status(204).end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not clear items' });
   }
 });
 
