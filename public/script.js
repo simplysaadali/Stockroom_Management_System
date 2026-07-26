@@ -306,7 +306,7 @@ function loadAllData(){
 
   // If no items in localStorage, load default items from JSON file
   if (items.length === 0) {
-    fetch('data/items.json')
+    fetch('/data/items.json')
       .then(r => r.json())
       .then(data => {
         items = data;
