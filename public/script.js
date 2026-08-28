@@ -304,17 +304,19 @@ function loadAllData(){
     console.error('Failed to load data from localStorage', err);
   }
 
-  // If no items in localStorage, load default items from JSON file
-  if (items.length === 0) {
-    fetch('/data/items.json')
-      .then(r => r.json())
-      .then(data => {
-        items = data;
-        saveItems();
-        if (currentTabId === 'items') renderItems();
-      })
-      .catch(err => console.error('Failed to load default items', err));
-  }
+  fetch('/api/items')
+    .then(response => {
+      if (!response.ok) throw new Error(`Inventory request failed (${response.status})`);
+      return response.json();
+    })
+    .then(data => {
+      items = data;
+      if (currentTabId === 'items') renderItems();
+    })
+    .catch(err => {
+      console.error('Failed to load inventory from MongoDB', err);
+      if (currentTabId === 'items') showToast('Could not load inventory from MongoDB', true);
+    });
 }
 
 function saveManualBuyingPrices() {
@@ -336,6 +338,16 @@ function saveExpenses(){
 function saveItems(){
   try {
     window.localStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(items));
+    fetch('/api/items', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items)
+    }).then(response => {
+      if (!response.ok) throw new Error(`Inventory save failed (${response.status})`);
+    }).catch(err => {
+      console.error('Failed to save items to MongoDB', err);
+      showToast('Unable to save inventory to MongoDB', true);
+    });
   } catch (err) {
     console.error('Failed to save items', err);
     showToast('Unable to save items locally', true);
@@ -437,7 +449,7 @@ function renderItems(){
         <div class="item-code mono">#${pad(idx + 1)}</div>
         <div class="item-name-wrap">
           <input class="item-name" type="text" value="${escapeHtml(item.name)}" data-role="name">
-          <div class="item-sub">Saved locally</div>
+          <div class="item-sub">Saved in MongoDB</div>
         </div>
         <div class="item-price-wrap">
           <span class="mobile-only-label">Buying Price:</span>

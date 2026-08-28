@@ -1,29 +1,6 @@
 const express = require('express');
-const fs = require('fs').promises;
-const path = require('path');
+const Item = require('../models/Item');
 const router = express.Router();
-
-const dataFile = path.resolve(__dirname, '..', 'data', 'items.json');
-
-async function ensureDataFile() {
-  await fs.mkdir(path.dirname(dataFile), { recursive: true });
-  try {
-    await fs.access(dataFile);
-  } catch (err) {
-    await fs.writeFile(dataFile, '[]', 'utf8');
-  }
-}
-
-async function loadItems() {
-  await ensureDataFile();
-  const json = await fs.readFile(dataFile, 'utf8');
-  return JSON.parse(json || '[]');
-}
-
-async function saveItems(items) {
-  await ensureDataFile();
-  await fs.writeFile(dataFile, JSON.stringify(items, null, 2), 'utf8');
-}
 
 function ensureString(value, fallback = 'Untitled item') {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : fallback;
@@ -45,8 +22,8 @@ function generateId() {
 
 router.get('/', async (req, res) => {
   try {
-    const items = await loadItems();
-    res.json(items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
+    const items = await Item.find().sort({ createdAt: 1 }).lean();
+    res.json(items);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load items' });
@@ -55,17 +32,11 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const items = await loadItems();
-    const item = {
-      _id: generateId(),
+    const item = await Item.create({
       name: ensureString(req.body.name),
       qty: ensureQty(req.body.qty),
-      price: ensurePrice(req.body.price),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    items.push(item);
-    await saveItems(items);
+      price: ensurePrice(req.body.price)
+    });
     res.status(201).json(item);
   } catch (err) {
     console.error(err);
@@ -73,23 +44,34 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.put('/', async (req, res) => {
+  try {
+    if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Items must be an array' });
+    const items = req.body.map(item => ({
+      _id: item._id,
+      name: ensureString(item.name),
+      qty: ensureQty(item.qty),
+      price: ensurePrice(item.price),
+      createdAt: item.createdAt,
+      updatedAt: new Date()
+    }));
+    await Item.deleteMany({});
+    const saved = items.length ? await Item.insertMany(items) : [];
+    res.json(saved);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message || 'Could not save items' });
+  }
+});
+
 router.patch('/:id', async (req, res) => {
   try {
-    const items = await loadItems();
-    const index = items.findIndex(item => item._id === req.params.id);
-    if (index === -1) return res.status(404).json({ error: 'Not found' });
-
-    const existing = items[index];
-    const updated = {
-      ...existing,
-      name: req.body.name !== undefined ? ensureString(req.body.name, existing.name) : existing.name,
-      qty: req.body.qty !== undefined ? ensureQty(req.body.qty) : existing.qty,
-      price: req.body.price !== undefined ? ensurePrice(req.body.price) : (existing.price !== undefined ? existing.price : 0),
-      updatedAt: new Date().toISOString()
-    };
-
-    items[index] = updated;
-    await saveItems(items);
+    const updated = await Item.findByIdAndUpdate(req.params.id, {
+      ...(req.body.name !== undefined && { name: ensureString(req.body.name) }),
+      ...(req.body.qty !== undefined && { qty: ensureQty(req.body.qty) }),
+      ...(req.body.price !== undefined && { price: ensurePrice(req.body.price) })
+    }, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -99,7 +81,7 @@ router.patch('/:id', async (req, res) => {
 
 router.delete('/', async (req, res) => {
   try {
-    await saveItems([]);
+    await Item.deleteMany({});
     res.status(204).end();
   } catch (err) {
     console.error(err);
@@ -109,9 +91,7 @@ router.delete('/', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const items = await loadItems();
-    const nextItems = items.filter(item => item._id !== req.params.id);
-    await saveItems(nextItems);
+    await Item.findByIdAndDelete(req.params.id);
     res.status(204).end();
   } catch (err) {
     console.error(err);
