@@ -947,7 +947,7 @@ function renderBilling() {
           <div style="font-weight: 600; color: var(--text);">${escapeHtml(item.name)}</div>
           <div class="item-sub">Ordered Item #${idx + 1}</div>
         </div>
-        <div class="mono" style="font-size: 14px;">${Number(item.price).toFixed(2)}</div>
+        <input class="price-input mono" type="number" min="0" step="0.01" value="${Number(item.price)}" data-role="edit-bill-price" data-index="${idx}" aria-label="Unit price for ${escapeHtml(item.name)}" style="width: 100px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 14px; background: var(--paper-raised); color: var(--text);">
         <div class="mono" style="font-size: 14px;">${item.qty}</div>
         <div class="mono" style="text-align: right; font-weight: 600; color: var(--ink);">${itemTotal.toFixed(2)}</div>
         <button class="remove-btn" data-role="remove-bill-item" data-index="${idx}" aria-label="Remove item" style="width: 28px; height: 28px; font-size: 12px; margin-left: auto;">✕</button>
@@ -1033,6 +1033,24 @@ billingSearch.addEventListener('keydown', (e) => {
       openPriceQtyModal(val);
     }
   }
+});
+
+// Update an item's price directly from the active bill.
+billingItemsList.addEventListener('change', (e) => {
+  const input = e.target.closest('input[data-role="edit-bill-price"]');
+  if (!input || !activeOrder) return;
+
+  const index = parseInt(input.dataset.index, 10);
+  const price = input.value.trim() === '' ? 0 : parseFloat(input.value);
+  if (!activeOrder.items[index] || isNaN(price) || price < 0) {
+    showToast('Please enter a valid price (>= 0)', true);
+    renderBilling();
+    return;
+  }
+
+  activeOrder.items[index].price = price;
+  saveActiveOrder();
+  renderBilling();
 });
 
 // Remove item from active bill
@@ -1242,7 +1260,9 @@ priceQtyModal.addEventListener('click', (e) => {
 });
 
 function handleModalSubmit() {
-  const price = parseFloat(modalPrice.value);
+  const price = modalContext === 'customer' && modalPrice.value.trim() === ''
+    ? 0
+    : parseFloat(modalPrice.value);
   const qty = parseInt(modalQty.value, 10);
 
   if (isNaN(price) || price < 0) {
